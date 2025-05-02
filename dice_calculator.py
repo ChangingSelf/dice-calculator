@@ -24,40 +24,68 @@ class DiceCalculator:
             if expression.isdigit():
                 return [(1, int(expression))], 0
 
-            # 分离修正值
-            parts = expression.split("+")
-
-            # 尝试检测最后一部分是否为修正值
-            if len(parts) > 1 and parts[-1].isdigit():
-                dice_parts = parts[:-1]
-                modifier = int(parts[-1])
-            else:
-                dice_parts = parts
-                modifier = 0
-
+            # 提取骰子表达式和修正值（更健壮的方法）
             dice_list = []
-            for part in dice_parts:
-                # 检查特殊情况：单个d开头（如d20，表示1d20）
-                if part.startswith("d") and part[1:].isdigit():
-                    num_dice = 1
-                    num_sides = int(part[1:])
+            modifier = 0
+            
+            # 分割表达式为操作数（骰子或数字）和操作符（+ 或 -）
+            operands = []
+            operators = []
+            current = ""
+            
+            # 解析表达式为操作数和操作符
+            for i, char in enumerate(expression):
+                if char in "+-" and i > 0:  # 不处理开头的符号
+                    if current:
+                        operands.append(current)
+                        current = ""
+                    operators.append(char)
                 else:
-                    # 标准格式：XdY
-                    match = re.match(r"(\d+)d(\d+)", part)
-                    if match:
-                        num_dice = int(match.group(1))
-                        num_sides = int(match.group(2))
+                    current += char
+            
+            # 添加最后一个操作数
+            if current:
+                operands.append(current)
+            
+            # 处理所有操作数和操作符
+            for i, operand in enumerate(operands):
+                # 检查是否是骰子表达式（如 2d20）或纯数字
+                if "d" in operand:
+                    # 骰子表达式
+                    if operand.startswith("d") and operand[1:].isdigit():
+                        # 特殊情况：d20 表示 1d20
+                        num_dice = 1
+                        num_sides = int(operand[1:])
                     else:
-                        raise ValueError(f"无效的骰子表达式: {part}")
-
-                # 验证骰子参数
-                if num_dice <= 0:
-                    raise ValueError(f"骰子数量({num_dice})必须大于0")
-                if num_sides <= 0:
-                    raise ValueError(f"骰子面数({num_sides})必须大于0")
-
-                dice_list.append((num_dice, num_sides))
-
+                        # 标准格式：XdY
+                        match = re.match(r"(\d+)d(\d+)", operand)
+                        if match:
+                            num_dice = int(match.group(1))
+                            num_sides = int(match.group(2))
+                        else:
+                            raise ValueError(f"无效的骰子表达式: {operand}")
+                    
+                    # 验证骰子参数
+                    if num_dice <= 0:
+                        raise ValueError(f"骰子数量({num_dice})必须大于0")
+                    if num_sides <= 0:
+                        raise ValueError(f"骰子面数({num_sides})必须大于0")
+                    
+                    # 添加到骰子列表
+                    dice_list.append((num_dice, num_sides))
+                else:
+                    # 纯数字，作为修正值
+                    if operand.isdigit():
+                        # 考虑操作符
+                        op = "+" if i == 0 else operators[i-1]
+                        value = int(operand)
+                        if op == "+":
+                            modifier += value
+                        else:  # op == "-"
+                            modifier -= value
+                    else:
+                        raise ValueError(f"无效的操作数: {operand}")
+            
             if not dice_list:
                 raise ValueError("表达式必须包含至少一个骰子")
 
